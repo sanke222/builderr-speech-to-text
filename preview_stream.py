@@ -21,8 +21,11 @@ from evaluator import _evaluate  # noqa: E402
 
 def main():
     manifest = os.path.join(HERE, "samples/manifest.json")
-    res = asyncio.run(_evaluate(manifest, "solution.stream_server", runs=5,
-                                enforce_offline=True))
+    from evaluator import DEFAULT_WARMUP_WAV
+    res = asyncio.run(_evaluate(
+        manifest, "solution.stream_server", runs=5, enforce_offline=True,
+        warmup_wav=DEFAULT_WARMUP_WAV, deny_read_roots=[], server_log="server_preview.log"
+    ))
     print(f"\n  streaming score   {res['overall_score']}/100")
     print(f"  meaning {res['meaning_mean']}   WER {res['wer_mean']}")
     print(f"  median end-to-final {res['median_end_to_final_ms']}ms")
