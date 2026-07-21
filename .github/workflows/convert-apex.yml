@@ -1,0 +1,62 @@
+name: convert-apex-mlx
+
+# Run ONCE manually to convert Oriserve Apex -> MLX 4-bit and upload to your HF repo.
+# After this succeeds, set APEX_MODEL in mac-stream.yml to your uploaded repo ID.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hf_repo:
+        description: "Target HF repo to push to (e.g. yourname/whisper-hindi2hinglish-apex-mlx)"
+        required: true
+
+jobs:
+  convert:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install --quiet mlx-whisper huggingface_hub
+
+      - name: Convert Oriserve Apex -> MLX 4-bit
+        run: |
+          python - <<'EOF'
+          from mlx_whisper.convert import convert
+          convert(
+              "Oriserve/Whisper-Hindi2Hinglish-Apex",
+              mlx_path="/tmp/apex-mlx",
+              quantize=True,
+              q_bits=4,
+          )
+          print("conversion done")
+          EOF
+
+      - name: Smoke-test on Hinglish samples
+        run: |
+          python - <<'EOF'
+          import mlx_whisper, glob, os
+          for wav in sorted(glob.glob("samples/openslr104*.wav")):
+              r = mlx_whisper.transcribe(wav, path_or_hf_repo="/tmp/apex-mlx",
+                                         language="en", temperature=0.0,
+                                         condition_on_previous_text=False)
+              print(os.path.basename(wav), "->", r["text"][:120])
+          EOF
+
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = "${{ github.event.inputs.hf_repo }}"
+          api.create_repo(repo, exist_ok=True)
+          api.upload_folder(folder_path="/tmp/apex-mlx", repo_id=repo)
+          print("uploaded to", repo)
+          EOF

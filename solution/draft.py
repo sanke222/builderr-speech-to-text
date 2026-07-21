@@ -1,52 +1,70 @@
-"""The ONE function you implement for the STREAMING dictation track.
-
-You do NOT build a server. The sealed harness (solution/stream_server.py) handles
-the WebSocket, the real-time audio feed, and emitting events. You write `draft()`.
+"""The ONE function the STREAMING dictation track scores: draft().
 
     draft(audio_buffer, is_final) -> (text_so_far, stable_chars)
 
-The harness calls draft() repeatedly as audio arrives (is_final=False) and once
-after the user stops (is_final=True). audio_buffer is ALL audio so far: raw PCM
-s16le, mono, 16kHz (little-endian int16). Return:
+Architecture (matches the reference-bot shape, built to beat it):
 
-  - text_so_far : your best transcript of the audio heard so far. Keep the
-                  Hindi-English code-switch faithful — write what was actually
-                  said, don't translate the mix into English (the scorecard caps
-                  that). On is_final=True, return your best full transcript.
-  - stable_chars: optional UX metadata for partial display. It is not scored.
+  1. Fast lane  — Parakeet (parakeet-mlx) for English / Indian-English. Cheap,
+     sub-second, runs on the rolling buffer.
+  2. Router     — whisper-tiny language ID on the prefix decides plain-English
+     (keep fast lane) vs Hindi-mixed (escalate). We only pay for the heavy model
+     when the clip needs it, so English clips stay fast.
+  3. Hinglish   — Oriserve Apex (mlx-whisper) faithful romanized code-switch,
+     ONLY on escalated / final clips.
+  4. Finalizer  — faithful cleanup (digits, negation kept, loop guard). Never
+     translates the mix; never blanks.
 
-Tips that match how the reference engine (RambleFix) does it:
-  - Re-decode the rolling prefix; commit the longest common prefix with your
-    previous draft (that part has stopped changing — safe to lock).
-  - Don't translate to chase a meaning score; it kills faithfulness and is capped.
-  - Spend effort on the final transcript and how quickly it arrives after the
-    user stops. Partial timing and rewrites are not scored.
-  - Never return a blank, a loop, or hang — degrade to your best partial instead.
-
-This reference body wraps a local faster-whisper draft on the rolling buffer and
-can emit a stable common prefix for preview UX. If faster-whisper isn't installed it returns an
-empty draft (clearly a non-winning placeholder) so the contract still validates.
-Replace the body with your own router + Hindi-capable model + finalizer.
+Latency trick: partials aren't scored, so we use them as free compute. During
+speech we decode the rolling buffer on the fast lane and commit a stable common
+prefix. On is_final we produce the faithful final; end-to-final latency is
+measured from the last frame, so keeping the heavy decode scoped to the tail /
+final keeps the paste fast.
 """
 from __future__ import annotations
 
 import re
 
-_SR = 16000
-_MIN_AUDIO_BYTES = int(_SR * 0.75) * 2  # ~0.75s before the first draft (2 bytes/sample)
+from solution import engines
+from solution.finalizer import finalize
 
-# per-clip state (the harness calls draft_reset() between clips)
+_SR = 16000
+_MIN_AUDIO_BYTES = int(_SR * 0.75) * 2  # ~0.75s before the first draft
+
+# per-clip state (harness calls draft_reset() between clips)
 _prev_text: str = ""
 _committed: str = ""
-_model = None
-_np = None
+_route: str = "fast"        # 'fast' | 'hinglish', decided once per clip
+_route_reason: str = ""
+_lang: str = ""
 
 
 def draft_reset() -> None:
-    """Called by the sealed harness at the start of each clip. Clear per-clip state."""
-    global _prev_text, _committed
+    """Called by the sealed harness at the start of each clip. Clear state."""
+    global _prev_text, _committed, _route, _route_reason, _lang
     _prev_text = ""
     _committed = ""
+    _route = "fast"
+    _route_reason = ""
+    _lang = ""
+
+
+def route_debug() -> dict:
+    """Expose the last routing decision for the debug harness (unscored)."""
+    return {"route": _route, "reason": _route_reason, "lang": _lang,
+            "timings_ms": engines.last_timings()}
+
+
+def _decide_route(audio) -> None:
+    """Set the per-clip route once, from a cheap language-ID pass."""
+    global _route, _route_reason, _lang
+    if _route_reason:  # already decided for this clip
+        return
+    lang, _prob = engines.detect_language(audio)
+    _lang = lang
+    if lang in {"hi", "ur", "mr", "ne", "sa"}:  # Hindi-family -> code-switch path
+        _route, _route_reason = "hinglish", f"lang={lang}"
+    else:
+        _route, _route_reason = "fast", f"lang={lang}"
 
 
 def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
@@ -54,44 +72,34 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
     if not is_final and len(audio_buffer) < _MIN_AUDIO_BYTES:
         return (_committed, len(_committed))
 
-    text = _transcribe_pcm(audio_buffer)
-    if not text:
-        # never blank-out a committed prefix; hold what we have
+    audio = engines.pcm_to_float32(audio_buffer)
+    if audio.size == 0:
         return (_committed, len(_committed))
 
-    # commit the longest common WORD prefix with the previous draft — that part
-    # has stabilized across two decodes, so it's safe to lock.
-    stable_text = _common_word_prefix(_prev_text, text)
-    if len(stable_text) >= len(_committed):
-        _committed = stable_text
-    _prev_text = text
+    _decide_route(audio)
 
     if is_final:
-        # final: everything is committed; return the full transcript
+        # spend the quality budget here: faithful decode on the chosen lane.
+        if _route == "hinglish":
+            text = engines.transcribe_hinglish(audio) or engines.transcribe_fast(audio)
+        else:
+            text = engines.transcribe_fast(audio) or engines.transcribe_hinglish(audio)
+        text = finalize(text)
+        if not text:
+            # never blank: fall back to whatever we had committed
+            return (_committed or _prev_text, len(_committed or _prev_text))
         _committed = text
         return (text, len(text))
 
+    # --- partial (unscored): cheap fast-lane decode, commit stable prefix ---
+    text = engines.transcribe_fast(audio)
+    if not text:
+        return (_committed, len(_committed))
+    stable = _common_word_prefix(_prev_text, text)
+    if len(stable) >= len(_committed):
+        _committed = stable
+    _prev_text = text
     return (text, len(_committed))
-
-
-def _transcribe_pcm(audio_buffer: bytes) -> str:
-    """Local, offline ASR on the rolling PCM prefix. Reference uses faster-whisper."""
-    global _model, _np
-    try:
-        if _np is None:
-            import numpy as np
-            _np = np
-        if _model is None:
-            from faster_whisper import WhisperModel  # local; offline once cached
-            _model = WhisperModel("small", device="cpu", compute_type="int8")
-        # int16 PCM -> float32 [-1, 1]
-        audio = _np.frombuffer(audio_buffer, dtype=_np.int16).astype(_np.float32) / 32768.0
-        if audio.size == 0:
-            return ""
-        segments, _info = _model.transcribe(audio, language=None, task="transcribe")
-        return " ".join(s.text for s in segments).strip()
-    except Exception:  # noqa: BLE001 - no model installed yet, or transient decode error
-        return ""
 
 
 def _common_word_prefix(left: str, right: str) -> str:

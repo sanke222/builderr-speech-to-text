@@ -1,0 +1,88 @@
+name: mac-stream-debug
+
+# Runs the streaming engine on an Apple Silicon runner (macos-14 = M1):
+#   1. Install deps + download/JIT models (network allowed)
+#   2. Prove offline: block_network() then re-run all 6 samples
+#   3. Per-clip debug table: lane, raw Parakeet, raw Apex, final, gold, scores, timings
+#   4. preview_stream.py: official streaming scorecard over the 6 samples
+# Trigger manually or on push to main.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "solution/**"
+      - "scripts/debug_stream.py"
+      - "scripts/offline_check.py"
+      - ".github/workflows/mac-stream.yml"
+
+jobs:
+  stream-debug:
+    runs-on: macos-14        # Apple Silicon M1, Neural Engine available
+    timeout-minutes: 40
+
+    env:
+      # Override model repos here to pin specific converted checkpoints.
+      # Defaults (in engines.py) pull from mlx-community on first run.
+      PARAKEET_MODEL: "mlx-community/parakeet-tdt_ctc-110m"
+      APEX_MODEL:     "mlx-community/whisper-large-v3-turbo"
+      DETECT_MODEL:   "mlx-community/whisper-tiny"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Cache the Hugging Face model hub so repeated runs don't re-download
+      - name: Cache HF models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-models-${{ env.PARAKEET_MODEL }}-${{ env.APEX_MODEL }}-${{ env.DETECT_MODEL }}
+          restore-keys: hf-models-
+
+      - name: Install Python deps
+        run: |
+          pip install --quiet \
+            mlx-whisper \
+            parakeet-mlx \
+            websockets \
+            numpy \
+            soundfile
+
+      # ── Step 1: warmup (network allowed) ──────────────────────────────────
+      - name: Warmup — pull + JIT all models
+        run: |
+          python - <<'EOF'
+          from solution import engines
+          status = engines.warm_all()
+          print("warmup status:", status)
+          failed = [k for k, v in status.items() if not v]
+          if failed:
+              raise SystemExit(f"engines failed to load: {failed}")
+          print("all engines warm and ready")
+          EOF
+
+      # ── Step 2: offline proof ──────────────────────────────────────────────
+      - name: Offline proof — block_network() then run all 6 samples
+        run: python scripts/offline_check.py
+
+      # ── Step 3: per-clip debug table ───────────────────────────────────────
+      - name: Per-clip debug (lane / raw / final / gold / scores / timings)
+        run: python scripts/debug_stream.py samples/manifest.json | tee debug_table.txt
+
+      # ── Step 4: official streaming scorecard ──────────────────────────────
+      - name: Streaming scorecard (preview_stream.py)
+        run: python preview_stream.py | tee streaming_score.txt
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stream-debug-logs
+          path: |
+            debug_table.txt
+            streaming_score.txt
