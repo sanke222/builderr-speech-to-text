@@ -1,0 +1,4 @@
+mlx-whisper
+mlx-audio
+numpy
+huggingface_hub
