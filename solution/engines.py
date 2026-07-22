@@ -61,8 +61,8 @@ def last_timings() -> dict[str, float]:
 def _load_parakeet():
     global _parakeet
     if _parakeet is None:
-        from parakeet_mlx import from_pretrained  # local import; offline once cached
-        _parakeet = from_pretrained(PARAKEET_MODEL)
+        from mlx_audio.stt.utils import load
+        _parakeet = load(PARAKEET_MODEL)
     return _parakeet
 
 
@@ -88,7 +88,7 @@ def transcribe_fast(audio) -> str:
                 w.setsampwidth(2)
                 w.setframerate(_SR)
                 w.writeframes(pcm)
-            result = model.transcribe(temp_path)
+            result = model.generate(audio=temp_path)
         finally:
             os.remove(temp_path)
             

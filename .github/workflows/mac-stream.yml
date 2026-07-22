@@ -48,7 +48,7 @@ jobs:
         run: |
           pip install --quiet \
             mlx-whisper \
-            parakeet-mlx \
+            mlx-audio \
             websockets \
             numpy \
             soundfile
