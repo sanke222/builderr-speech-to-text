@@ -130,7 +130,7 @@ def transcribe_hinglish(audio) -> str:
             language="en",
             temperature=0.0,
             condition_on_previous_text=False,
-            initial_prompt="GNU Linux, LibreOffice, Impress window, slide insert. Technical meeting terms.",
+            initial_prompt="Yeh audio ek technical meeting hai jahan open source software, features aur operating systems ki baat ho rahi hai.",
             fp16=True,
         )
         out = (result.get("text") or "").strip()
