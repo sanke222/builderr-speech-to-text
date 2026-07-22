@@ -22,6 +22,10 @@ from __future__ import annotations
 import os
 import time
 
+# Force huggingface_hub into offline mode so it doesn't try to ping the API
+# and crash the evaluator's offline guard. We only lift this during warm_all().
+os.environ["HF_HUB_OFFLINE"] = "1"
+
 _SR = 16000
 
 PARAKEET_MODEL = os.environ.get("PARAKEET_MODEL", "mlx-community/parakeet-tdt_ctc-110m")
@@ -175,6 +179,9 @@ def warm_all() -> dict[str, bool]:
 
     Returns {engine: ok} so CI can assert models actually loaded offline-ready.
     """
+    if "HF_HUB_OFFLINE" in os.environ:
+        del os.environ["HF_HUB_OFFLINE"]
+        
     np = _numpy()
     silence = np.zeros(_SR, dtype=np.float32)  # 1s of silence
     status: dict[str, bool] = {}
@@ -188,4 +195,6 @@ def warm_all() -> dict[str, bool]:
             status[name] = True
         except Exception:  # noqa: BLE001
             status[name] = False
+            
+    os.environ["HF_HUB_OFFLINE"] = "1"
     return status
