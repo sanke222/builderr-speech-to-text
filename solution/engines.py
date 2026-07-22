@@ -71,7 +71,27 @@ def transcribe_fast(audio) -> str:
     t0 = time.monotonic()
     try:
         model = _load_parakeet()
-        result = model.transcribe(audio)
+        
+        import tempfile
+        import wave
+        
+        np = _numpy()
+        # Convert float32 array back to int16 bytes
+        pcm = (audio * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+        
+        fd, temp_path = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        
+        try:
+            with wave.open(temp_path, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(_SR)
+                w.writeframes(pcm)
+            result = model.transcribe(temp_path)
+        finally:
+            os.remove(temp_path)
+            
         text = getattr(result, "text", None)
         if text is None and isinstance(result, (list, tuple)) and result:
             text = getattr(result[0], "text", "")
