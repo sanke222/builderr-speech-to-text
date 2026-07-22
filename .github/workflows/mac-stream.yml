@@ -37,11 +37,14 @@ jobs:
           python-version: "3.11"
 
       # Cache the Hugging Face model hub so repeated runs don't re-download
-      - name: Cache HF models
+      - name: Cache HF models and converted MLX model
         uses: actions/cache@v4
+        id: mlx-cache
         with:
-          path: ~/.cache/huggingface
-          key: hf-models-${{ env.PARAKEET_MODEL }}-trelis-v1-${{ env.DETECT_MODEL }}
+          path: |
+            ~/.cache/huggingface
+            ./trelis-mlx-q4
+          key: hf-models-${{ env.PARAKEET_MODEL }}-trelis-v1-mlx-${{ env.DETECT_MODEL }}
           restore-keys: hf-models-
 
       - name: Install Python deps
@@ -56,12 +59,13 @@ jobs:
             torch
             
       - name: Unshard Trelis model
+        if: steps.mlx-cache.outputs.cache-hit != 'true'
         run: |
           python -c "from transformers import WhisperForConditionalGeneration, WhisperProcessor; WhisperForConditionalGeneration.from_pretrained('Trelis/whisper-hinglish-preview').save_pretrained('./trelis-unsharded', max_shard_size='10GB'); WhisperProcessor.from_pretrained('Trelis/whisper-hinglish-preview').save_pretrained('./trelis-unsharded')"
 
       - name: Convert and quantize Trelis model to MLX
+        if: steps.mlx-cache.outputs.cache-hit != 'true'
         run: |
-          # The cache will preserve the downloaded HF weights, so conversion is fast on rerun
           curl -sLO https://raw.githubusercontent.com/ml-explore/mlx-examples/main/whisper/convert.py
           python convert.py -q --torch-name-or-path ./trelis-unsharded --mlx-path ./trelis-mlx-q4
           mv ./trelis-mlx-q4/model.safetensors ./trelis-mlx-q4/weights.safetensors
