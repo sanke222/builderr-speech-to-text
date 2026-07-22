@@ -10,7 +10,7 @@ name: mac-stream-debug
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, trelis-mlx-hinglish]
     paths:
       - "solution/**"
       - "scripts/debug_stream.py"
