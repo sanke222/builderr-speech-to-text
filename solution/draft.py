@@ -55,15 +55,16 @@ def route_debug() -> dict:
 
 
 def _decide_route(audio) -> None:
-    """Set the per-clip route once, from a cheap language-ID pass."""
+    """Set the per-clip route. Escalates to hinglish if Hindi is detected at any point."""
     global _route, _route_reason, _lang
-    if _route_reason:  # already decided for this clip
+    if _route == "hinglish":  # already escalated for this clip
         return
     lang, _prob = engines.detect_language(audio)
     _lang = lang
     if lang in {"hi", "ur", "mr", "ne", "sa"}:  # Hindi-family -> code-switch path
         _route, _route_reason = "hinglish", f"lang={lang}"
     else:
+        # Keep updating the reason but stay on fast lane (can still escalate later)
         _route, _route_reason = "fast", f"lang={lang}"
 
 
