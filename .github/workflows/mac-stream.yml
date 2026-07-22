@@ -58,7 +58,8 @@ jobs:
       - name: Convert and quantize Trelis model to MLX
         run: |
           # The cache will preserve the downloaded HF weights, so conversion is fast on rerun
-          python -m mlx_whisper.convert --q4 --hf-path Trelis/whisper-hinglish-preview --mlx-path ./trelis-mlx-q4
+          curl -sLO https://raw.githubusercontent.com/ml-explore/mlx-examples/main/whisper/convert.py
+          python convert.py --q4 --hf-path Trelis/whisper-hinglish-preview --mlx-path ./trelis-mlx-q4
 
       # ── Step 1: warmup (network allowed) ──────────────────────────────────
       - name: Warmup — pull + JIT all models
