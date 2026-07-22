@@ -64,6 +64,7 @@ jobs:
           # The cache will preserve the downloaded HF weights, so conversion is fast on rerun
           curl -sLO https://raw.githubusercontent.com/ml-explore/mlx-examples/main/whisper/convert.py
           python convert.py -q --torch-name-or-path ./trelis-unsharded --mlx-path ./trelis-mlx-q4
+          mv ./trelis-mlx-q4/model.safetensors ./trelis-mlx-q4/weights.safetensors
 
       # ── Step 1: warmup (network allowed) ──────────────────────────────────
       - name: Warmup — pull + JIT all models
