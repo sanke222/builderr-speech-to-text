@@ -26,7 +26,7 @@ jobs:
       # Override model repos here to pin specific converted checkpoints.
       # Defaults (in engines.py) pull from mlx-community on first run.
       PARAKEET_MODEL: "mlx-community/parakeet-tdt_ctc-110m"
-      APEX_MODEL:     "./trelis-mlx-q4"
+      APEX_MODEL:     "sanke/trelis-mlx-hinglish-q4"
       DETECT_MODEL:   "mlx-community/whisper-tiny"
 
     steps:
@@ -58,17 +58,7 @@ jobs:
             transformers \
             torch
             
-      - name: Unshard Trelis model
-        if: steps.mlx-cache.outputs.cache-hit != 'true'
-        run: |
-          python -c "from transformers import WhisperForConditionalGeneration, WhisperProcessor; WhisperForConditionalGeneration.from_pretrained('Trelis/whisper-hinglish-preview').save_pretrained('./trelis-unsharded', max_shard_size='10GB'); WhisperProcessor.from_pretrained('Trelis/whisper-hinglish-preview').save_pretrained('./trelis-unsharded')"
 
-      - name: Convert and quantize Trelis model to MLX
-        if: steps.mlx-cache.outputs.cache-hit != 'true'
-        run: |
-          curl -sLO https://raw.githubusercontent.com/ml-explore/mlx-examples/main/whisper/convert.py
-          python convert.py -q --torch-name-or-path ./trelis-unsharded --mlx-path ./trelis-mlx-q4
-          mv ./trelis-mlx-q4/model.safetensors ./trelis-mlx-q4/weights.safetensors
 
       # ── Step 1: warmup (network allowed) ──────────────────────────────────
       - name: Warmup — pull + JIT all models
@@ -104,9 +94,4 @@ jobs:
             debug_table.txt
             streaming_score.txt
 
-      - name: Upload MLX Model
-        uses: actions/upload-artifact@v4
-        with:
-          name: trelis-mlx-q4
-          path: ./trelis-mlx-q4/
-          retention-days: 1
+
