@@ -26,7 +26,7 @@ jobs:
       # Override model repos here to pin specific converted checkpoints.
       # Defaults (in engines.py) pull from mlx-community on first run.
       PARAKEET_MODEL: "mlx-community/parakeet-tdt_ctc-110m"
-      APEX_MODEL:     "mlx-community/whisper-large-v3-turbo"
+      APEX_MODEL:     "knownsense/whisper-hindi-apex-mlx"
       DETECT_MODEL:   "mlx-community/whisper-tiny"
 
     steps:

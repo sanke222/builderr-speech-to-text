@@ -25,7 +25,7 @@ import time
 _SR = 16000
 
 PARAKEET_MODEL = os.environ.get("PARAKEET_MODEL", "mlx-community/parakeet-tdt_ctc-110m")
-APEX_MODEL = os.environ.get("APEX_MODEL", "mlx-community/whisper-large-v3-turbo")
+APEX_MODEL = os.getenv("APEX_MODEL", "knownsense/whisper-hindi-apex-mlx")
 DETECT_MODEL = os.environ.get("DETECT_MODEL", "mlx-community/whisper-tiny")
 
 # module-level singletons (loaded once, reused across every draft() call)
@@ -76,7 +76,9 @@ def transcribe_fast(audio) -> str:
         if text is None and isinstance(result, (list, tuple)) and result:
             text = getattr(result[0], "text", "")
         out = (text or "").strip()
-    except Exception:  # noqa: BLE001 - missing pkg/model or transient decode error
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         out = ""
     _last_timings["fast_ms"] = (time.monotonic() - t0) * 1000.0
     return out
