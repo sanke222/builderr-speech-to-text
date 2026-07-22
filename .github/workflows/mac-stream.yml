@@ -26,7 +26,7 @@ jobs:
       # Override model repos here to pin specific converted checkpoints.
       # Defaults (in engines.py) pull from mlx-community on first run.
       PARAKEET_MODEL: "mlx-community/parakeet-tdt_ctc-110m"
-      APEX_MODEL:     "sanke/trelis-mlx-hinglish-q4"
+      HINGLISH_MODEL: "sanke/trelis-mlx-hinglish-q4"
       DETECT_MODEL:   "mlx-community/whisper-tiny"
 
     steps:

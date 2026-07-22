@@ -14,7 +14,7 @@ empty string rather than crash — draft.py then holds its last good text.
 
 Model IDs are read from env so CI can pin local converted paths:
   PARAKEET_MODEL   default mlx-community/parakeet-tdt_ctc-110m  (English)
-  APEX_MODEL       default (converted) Oriserve Apex MLX dir / repo
+  HINGLISH_MODEL   default sanke/trelis-mlx-hinglish-q4
   DETECT_MODEL     default mlx-community/whisper-tiny
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ import time
 _SR = 16000
 
 PARAKEET_MODEL = os.environ.get("PARAKEET_MODEL", "mlx-community/parakeet-tdt_ctc-110m")
-APEX_MODEL = os.getenv("APEX_MODEL", "knownsense/whisper-hindi-apex-mlx")
+HINGLISH_MODEL = os.getenv("HINGLISH_MODEL", "sanke/trelis-mlx-hinglish-q4")
 DETECT_MODEL = os.environ.get("DETECT_MODEL", "mlx-community/whisper-tiny")
 
 # module-level singletons (loaded once, reused across every draft() call)
@@ -104,7 +104,7 @@ def transcribe_fast(audio) -> str:
     return out
 
 
-# --- Oriserve Apex faithful Hinglish path (romanized) --------------------
+# --- Trelis faithful Hinglish path (romanized) --------------------
 
 def _load_mlx_whisper():
     global _mlx_whisper
@@ -115,18 +115,17 @@ def _load_mlx_whisper():
 
 
 def transcribe_hinglish(audio) -> str:
-    """Apex (mlx-whisper) faithful code-switch decode -> romanized Hinglish.
+    """Trelis (mlx-whisper) faithful code-switch decode -> romanized Hinglish.
 
     Greedy, no prev-text conditioning: lowest latency and kills a common
-    repetition-loop source. language='en' matches Oriserve's card (Apex was
-    fine-tuned to emit Hindi audio as romanized Latin under the 'en' head).
+    repetition-loop source.
     """
     t0 = time.monotonic()
     try:
         mw = _load_mlx_whisper()
         result = mw.transcribe(
             audio,
-            path_or_hf_repo=APEX_MODEL,
+            path_or_hf_repo=HINGLISH_MODEL,
             language="hi",
             temperature=0.0,
             condition_on_previous_text=False,

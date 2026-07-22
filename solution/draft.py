@@ -83,7 +83,10 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
         if _route == "hinglish":
             text = engines.transcribe_hinglish(audio) or engines.transcribe_fast(audio)
         else:
-            text = engines.transcribe_fast(audio) or engines.transcribe_hinglish(audio)
+            # Pad with 0.5s of silence to prevent Parakeet from chopping the last word
+            import numpy as np
+            padded_audio = np.concatenate([audio, np.zeros(int(16000 * 0.5), dtype=np.float32)])
+            text = engines.transcribe_fast(padded_audio) or engines.transcribe_hinglish(audio)
         text = finalize(text)
         if not text:
             # never blank: fall back to whatever we had committed
