@@ -1,0 +1,57 @@
+== warmup (pull + JIT models; must finish before offline) ==
+   engines ready: {'fast': True, 'hinglish': True, 'detect': True}
+
+── fleurs_en_us_test_1904  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : 'However, due to the slow communication channels, styles in the West could lag behind by twenty five '
+   FINAL      : 'However, due to the slow communication channels, styles in the West could lag behind by 25 to 30 yea'
+   gold       : 'However, due to the slow communication channels, styles in the west could lag behind by 25 to 30 yea'
+   score      : exact meaning 0.947 / WER 0.053   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 909  fast 6218  hinglish 11404  total 4818
+
+── fleurs_en_us_test_1675  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : 'All nouns alongside the word save for you always begin with a capital letter even in the middle of a'
+   FINAL      : 'All nouns alongside the word save for you always begin with a capital letter even in the middle of a'
+   gold       : 'All nouns, alongside the word Sie for you, always begin with a capital letter, even in the middle of'
+   score      : exact meaning 0.952 / WER 0.048   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 434  fast 365  hinglish 11404  total 985
+
+── fleurs_en_us_test_1950  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : 'To the north and within easy reach is the romantic and fascinating town of Sintra and which was made'
+   FINAL      : 'To the north and within easy reach is the romantic and fascinating town of Sintra and which was made'
+   gold       : 'To the north and within easy reach is the romantic and fascinating town of Sintra and which was made'
+   score      : exact meaning 1.000 / WER 0.000   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 222  fast 215  hinglish 11404  total 891
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0000  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : 'Labour office impress may egg press to the document banana while Bunyadi formatting geish is spoken '
+   raw apex   : 'Libor office impress mein ek prastuti document banaana aur buniyaadi formatting ke is spoken tutoria'
+   FINAL      : 'Libor office impress mein ek prastuti document banaana aur buniyaadi formatting ke is spoken tutoria'
+   gold       : 'लिबर ऑफिस impress में एक प्रस्तुति document बनाना और बुनियादी formatting के इस spoken tutorial में आ'
+   gold(alt)  : 'libre office impress mein ek prastuti document banana aur buniyadi formatting ke is spoken tutorial '
+   score      : exact meaning 0.270 / WER 0.737   phonetic meaning 0.919 / WER 0.105
+   timings ms : detect 246  fast 284  hinglish 11404  total 13682
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0001  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : 'This tutorial may have impressed Window Ghag RMSK or Gas Light Insert Grey or Copy Grey Fonta Font C'
+   raw apex   : 'Is tutorial mein ham impress window ke bhaagon ke baare mein sikhenge aur kaise slide insert karen a'
+   FINAL      : 'Is tutorial mein ham impress window ke bhaagon ke baare mein sikhenge aur kaise slide insert karen a'
+   gold       : 'इस tutorial में हम impress window के भागों के बारे में सीखेंगे और कैसे स्लाइड इन्सर्ट करें और कॉपी क'
+   gold(alt)  : 'is tutorial mein hum impress window ke bhaagon ke baare mein seekhenge aur kaise slide insert karein'
+   score      : exact meaning 0.111 / WER 0.889   phonetic meaning 0.963 / WER 0.037
+   timings ms : detect 1147  fast 279  hinglish 1793  total 16446
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0002  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : 'Yahmane operating system KiruPayne Linux or Labor Office version three point three point four Koch K'
+   raw apex   : 'Yahaan ham apne operating system ke roop mein JNU Linux aur labor office version 3.3 0.4 ka upyog ka'
+   FINAL      : 'Yahaan ham apne operating system ke roop mein JNU Linux aur labor office version 3.3.4 ka upyog kar '
+   gold       : 'यहाँ हम अपने ऑपरेटिंग सिस्टम के रूप में gnu/linux और लिबरऑफिस वर्जन 334 का उपयोग कर रहे हैं'
+   gold(alt)  : 'yahan hum apne operating system ke roop mein gnu linux aur libreoffice version 334 ka upyog kar rahe'
+   score      : exact meaning 0.050 / WER 1.053   phonetic meaning 0.700 / WER 0.421
+   timings ms : detect 1147  fast 1398  hinglish 2007  total 14364
+

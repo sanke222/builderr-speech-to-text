@@ -26,7 +26,7 @@ jobs:
       # Override model repos here to pin specific converted checkpoints.
       # Defaults (in engines.py) pull from mlx-community on first run.
       PARAKEET_MODEL: "mlx-community/parakeet-tdt_ctc-110m"
-      APEX_MODEL:     "knownsense/whisper-hindi-apex-mlx"
+      APEX_MODEL:     "./trelis-mlx-q4"
       DETECT_MODEL:   "mlx-community/whisper-tiny"
 
     steps:
@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-models-${{ env.PARAKEET_MODEL }}-${{ env.APEX_MODEL }}-${{ env.DETECT_MODEL }}
+          key: hf-models-${{ env.PARAKEET_MODEL }}-trelis-v1-${{ env.DETECT_MODEL }}
           restore-keys: hf-models-
 
       - name: Install Python deps
@@ -51,7 +51,14 @@ jobs:
             mlx-audio \
             websockets \
             numpy \
-            soundfile
+            soundfile \
+            transformers \
+            torch
+            
+      - name: Convert and quantize Trelis model to MLX
+        run: |
+          # The cache will preserve the downloaded HF weights, so conversion is fast on rerun
+          python -m mlx_whisper.convert --q4 --hf-path Trelis/whisper-hinglish-preview --mlx-path ./trelis-mlx-q4
 
       # ── Step 1: warmup (network allowed) ──────────────────────────────────
       - name: Warmup — pull + JIT all models

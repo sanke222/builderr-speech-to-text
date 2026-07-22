@@ -1,0 +1,13 @@
+
+  streaming score   58.72/100
+  meaning 0.89   WER 0.14
+  median end-to-final 4386.0ms
+  final-ok 1.0   clips capped 5/6
+    ced28ff4e202644dc29f960d     score  76.64  final 3987.1ms  
+    bef2fab8305c33f38ec7cebc     score   50.0  final 4200.0ms  capped@50.0  required term missing;critical fact flip on final
+    874e8c5bade4dc14d626e7ca     score   50.0  final 4113.6ms  capped@50.0  required term missing;critical fact flip on final
+    3481276f346183a8564f820c     score   70.0  final 4001.1ms  capped@70.0  median final latency 4001ms > 4000ms
+    a61da578c0e2f42e4d16d87b     score   70.0  final 4498.3ms  capped@70.0  median final latency 4498ms > 4000ms
+    bc1a50564f4de56a260d5e6b     score  35.71  final 5516.0ms  capped@50.0  number changed/dropped;critical fact flip on final
+
+  (sample numbers are illustrative; the hidden set + your latency on the frozen CPU box rank you. The starter draft() scores low — that's your start line.)

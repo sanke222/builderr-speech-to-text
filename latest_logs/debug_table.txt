@@ -1,0 +1,57 @@
+== warmup (pull + JIT models; must finish before offline) ==
+   engines ready: {'fast': True, 'hinglish': True, 'detect': True}
+
+── fleurs_en_us_test_1904  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : ''
+   FINAL      : 'However, due to the slow communication channels, styles in the west could lag behind by 25 to 30 yea'
+   gold       : 'However, due to the slow communication channels, styles in the west could lag behind by 25 to 30 yea'
+   score      : exact meaning 0.947 / WER 0.053   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 124  fast 1671  hinglish 3344  total 3561
+
+── fleurs_en_us_test_1675  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : ''
+   FINAL      : 'All nouns alongside the world say for you always begin with a capital letter even in the middle of a'
+   gold       : 'All nouns, alongside the word Sie for you, always begin with a capital letter, even in the middle of'
+   score      : exact meaning 0.905 / WER 0.095   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 547  fast 1  hinglish 3434  total 4433
+
+── fleurs_en_us_test_1950  [English/fleurs_english]
+   route      : fast  (lang=en)
+   raw fast   : ''
+   FINAL      : 'To the north and within easy reach is the romantic and fascinating town of Cintara, in which was mad'
+   gold       : 'To the north and within easy reach is the romantic and fascinating town of Sintra and which was made'
+   score      : exact meaning 0.909 / WER 0.091   phonetic meaning 0.000 / WER 1.000
+   timings ms : detect 436  fast 1  hinglish 3883  total 3301
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0000  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : ''
+   raw apex   : 'Niber office impress mein ek prastuti document banaana aur buniyaadi formatting ke is spoken tutoria'
+   FINAL      : 'Niber office impress mein ek prastuti document banaana aur buniyaadi formatting ke is spoken tutoria'
+   gold       : 'लिबर ऑफिस impress में एक प्रस्तुति document बनाना और बुनियादी formatting के इस spoken tutorial में आ'
+   gold(alt)  : 'libre office impress mein ek prastuti document banana aur buniyadi formatting ke is spoken tutorial '
+   score      : exact meaning 0.270 / WER 0.737   phonetic meaning 0.919 / WER 0.105
+   timings ms : detect 396  fast 1  hinglish 2862  total 5252
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0001  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : ''
+   raw apex   : 'Hai. Is tutorial mein ham impress window ke bhaagon ke baare mein sikhenge aur kaise slide insert ka'
+   FINAL      : 'Hai. Is tutorial mein ham impress window ke bhaagon ke baare mein sikhenge aur kaise slide insert ka'
+   gold       : 'इस tutorial में हम impress window के भागों के बारे में सीखेंगे और कैसे स्लाइड इन्सर्ट करें और कॉपी क'
+   gold(alt)  : 'is tutorial mein hum impress window ke bhaagon ke baare mein seekhenge aur kaise slide insert karein'
+   score      : exact meaning 0.109 / WER 0.926   phonetic meaning 0.945 / WER 0.074
+   timings ms : detect 553  fast 1  hinglish 1563  total 7819
+
+── openslr104_hi_en_103085_w5Jyq3XMbb3WwiKQ_0002  [hi-en/openslr104_hinglish]
+   route      : hinglish  (lang=hi)
+   raw fast   : ''
+   raw apex   : 'Yahaan ham apne operating system ke roop mein JNU Linux aur labor office version 3.3 0.4 ka upyog ka'
+   FINAL      : 'Yahaan ham apne operating system ke roop mein JNU Linux aur labor office version 3.3 0.4 ka upyog ka'
+   gold       : 'यहाँ हम अपने ऑपरेटिंग सिस्टम के रूप में gnu/linux और लिबरऑफिस वर्जन 334 का उपयोग कर रहे हैं'
+   gold(alt)  : 'yahan hum apne operating system ke roop mein gnu linux aur libreoffice version 334 ka upyog kar rahe'
+   score      : exact meaning 0.048 / WER 1.158   phonetic meaning 0.714 / WER 0.421
+   timings ms : detect 648  fast 11  hinglish 1688  total 8660
+
