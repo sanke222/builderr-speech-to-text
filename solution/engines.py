@@ -127,14 +127,16 @@ def transcribe_hinglish(audio) -> str:
         result = mw.transcribe(
             audio,
             path_or_hf_repo=APEX_MODEL,
-            language="en",
+            language="hi",
             temperature=0.0,
             condition_on_previous_text=False,
             initial_prompt="Yeh audio ek technical meeting hai jahan open source software, features aur operating systems ki baat ho rahi hai.",
             fp16=True,
         )
         out = (result.get("text") or "").strip()
-    except Exception:  # noqa: BLE001
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         out = ""
     _last_timings["hinglish_ms"] = (time.monotonic() - t0) * 1000.0
     return out
