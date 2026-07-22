@@ -122,4 +122,16 @@ def finalize(text: str) -> str:
     cleaned = re.sub(r'([\d.]+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'([\d.]+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
     
+    # Spoken symbols (slash, dot, dash)
+    cleaned = re.sub(r'\s+slash\s+', '/', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'([a-zA-Z0-9]+)\s+dot\s+([a-zA-Z0-9]+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+(?:dash|hyphen)\s+', '-', cleaned, flags=re.IGNORECASE)
+    
+    # Percentages
+    cleaned = re.sub(r'(\d+(?:\.\d+)?)\s*percent\b', r'\1%', cleaned, flags=re.IGNORECASE)
+    
+    # Spaced acronyms (e.g., "A P I" -> "API")
+    # Matches a single uppercase letter followed by a space, if the next character is also an uppercase letter (word boundary)
+    cleaned = re.sub(r'\b([A-Z])\s+(?=[A-Z]\b)', r'\1', cleaned)
+    
     return cleaned.strip()
