@@ -119,7 +119,7 @@ def finalize(text: str) -> str:
     cleaned = re.sub(r'(\d+(?:\.\d+)+)\s+0?\.?(\d+)', r'\1.\2', cleaned)
     
     # Replace "3 point 3 point 4" with "3.3.4"
-    cleaned = re.sub(r'(\d+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'(\d+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'([\d.]+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'([\d.]+)\s+point\s+(\d+)', r'\1.\2', cleaned, flags=re.IGNORECASE)
     
     return cleaned.strip()

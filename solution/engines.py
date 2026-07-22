@@ -130,7 +130,7 @@ def transcribe_hinglish(audio) -> str:
             language="hi",
             temperature=0.0,
             condition_on_previous_text=False,
-            initial_prompt="Yeh audio ek technical meeting hai jahan open source software, features aur operating systems ki baat ho rahi hai.",
+            initial_prompt="Yeh audio ek technical meeting hai. Always use English terms for open source software, features, aur operating systems. Write numbers in digits (jaise 3, 4, 100).",
             fp16=True,
         )
         out = (result.get("text") or "").strip()
