@@ -35,7 +35,8 @@ jobs:
       # FW_HINGLISH_MODEL must point to the CT2 repo you produced with convert-zero-stt.yml.
       FW_ENGLISH_MODEL:  "Systran/faster-distil-whisper-small.en"
       FW_HINGLISH_MODEL: "sanke/zero-stt-hinglish-ct2"
-      FW_DETECT_MODEL:   "Systran/faster-whisper-tiny-ct2"
+      FW_DETECT_MODEL:   "Systran/faster-whisper-tiny"
+      HF_HUB_DISABLE_XET: "1"
 
     steps:
       - uses: actions/checkout@v4

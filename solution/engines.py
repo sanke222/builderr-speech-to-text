@@ -34,7 +34,9 @@ import time
 # ---------------------------------------------------------------------------
 # Offline guard: keep HF Hub from pinging the network during scoring.
 # We lift it during warm_all() and re-apply after.
+# Also disable HF XetHub CAS protocol to avoid CDN errors on CI runners.
 # ---------------------------------------------------------------------------
+os.environ["HF_HUB_DISABLE_XET"] = "1"
 os.environ["HF_HUB_OFFLINE"] = "1"
 
 _SR = 16000
@@ -51,7 +53,7 @@ DETECT_MODEL   = os.environ.get("DETECT_MODEL",   "mlx-community/whisper-tiny")
 # --- Linux / faster-whisper (CTranslate2 int8) ---
 FW_ENGLISH_MODEL  = os.environ.get("FW_ENGLISH_MODEL",  "Systran/faster-distil-whisper-small.en")
 FW_HINGLISH_MODEL = os.environ.get("FW_HINGLISH_MODEL", "sanke/zero-stt-hinglish-ct2")
-FW_DETECT_MODEL   = os.environ.get("FW_DETECT_MODEL",   "Systran/faster-whisper-tiny-ct2")
+FW_DETECT_MODEL   = os.environ.get("FW_DETECT_MODEL",   "Systran/faster-whisper-tiny")
 
 # Resolved local snapshot paths (populated by warm_all before network is blocked)
 _hinglish_path: str = HINGLISH_MODEL
@@ -247,12 +249,14 @@ def _load_fw_english():
     global _fw_english
     if _fw_english is None:
         from faster_whisper import WhisperModel
+        token = os.environ.get("HF_TOKEN")
         _fw_english = WhisperModel(
             FW_ENGLISH_MODEL,
             device="cpu",
             compute_type="int8",
             cpu_threads=max(1, (os.cpu_count() or 2)),
             num_workers=1,
+            auth_token=token if token else None,
         )
     return _fw_english
 
@@ -262,12 +266,14 @@ def _load_fw_hinglish():
     global _fw_hinglish
     if _fw_hinglish is None:
         from faster_whisper import WhisperModel
+        token = os.environ.get("HF_TOKEN")
         _fw_hinglish = WhisperModel(
             FW_HINGLISH_MODEL,
             device="cpu",
             compute_type="int8",
             cpu_threads=max(1, (os.cpu_count() or 2)),
             num_workers=1,
+            auth_token=token if token else None,
         )
     return _fw_hinglish
 
@@ -277,12 +283,14 @@ def _load_fw_detect():
     global _fw_detect
     if _fw_detect is None:
         from faster_whisper import WhisperModel
+        token = os.environ.get("HF_TOKEN")
         _fw_detect = WhisperModel(
             FW_DETECT_MODEL,
             device="cpu",
             compute_type="int8",
             cpu_threads=2,
             num_workers=1,
+            auth_token=token if token else None,
         )
     return _fw_detect
 
