@@ -68,13 +68,9 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
         lang, _prob = engines.detect_language(audio)
         _lang = lang
 
-        # 2. Pad audio array to full 30-second Whisper window to prevent trailing word chopping
-        target_len = 16000 * 30
-        if len(audio) < target_len:
-            import numpy as np
-            padded_audio = np.concatenate([audio, np.zeros(target_len - len(audio), dtype=np.float32)])
-        else:
-            padded_audio = audio
+        # 2. Pad audio array with 0.8s trailing silence to prevent word chopping while keeping latency ~1.2s
+        import numpy as np
+        padded_audio = np.concatenate([audio, np.zeros(int(16000 * 0.8), dtype=np.float32)])
 
         # 3. Decode on the chosen lane
         if lang in {"hi", "ur", "mr", "ne", "sa"}:
