@@ -1,0 +1,66 @@
+name: convert-zero-stt-ct2
+
+# Run ONCE manually to convert shunyalabs/zero-stt-hinglish -> CTranslate2 int8.
+# The converted model is uploaded as a GitHub Actions artifact — download it locally,
+# then either:
+#   a) Point FW_HINGLISH_MODEL to the local path in linux-stream.yml, OR
+#   b) Push it to your own HF repo manually:
+#        huggingface-cli upload <yourname/zero-stt-hinglish-ct2> ./zero-stt-hinglish-ct2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── Install conversion deps ──────────────────────────────────────────
+      - name: Install deps
+        run: |
+          pip install --quiet \
+            "ctranslate2>=4.0" \
+            "transformers>=4.40" \
+            torch \
+            faster-whisper \
+            soundfile \
+            huggingface_hub
+
+      # ── Convert zero-stt-hinglish -> CTranslate2 int8 ───────────────────
+      - name: Convert shunyalabs/zero-stt-hinglish -> CT2 int8
+        run: |
+          python scripts/convert_zero_stt.py \
+            --output-dir ./zero-stt-hinglish-ct2
+
+      # ── Smoke-test on the 3 Hinglish sample clips ───────────────────────
+      - name: Smoke-test on Hinglish samples
+        run: |
+          python - <<'EOF'
+          import glob, os
+          from faster_whisper import WhisperModel
+
+          model = WhisperModel("./zero-stt-hinglish-ct2", device="cpu", compute_type="int8")
+          for wav in sorted(glob.glob("samples/openslr104*.wav")):
+              segs, info = model.transcribe(
+                  wav, language="hi", beam_size=1, temperature=0.0,
+                  condition_on_previous_text=False,
+              )
+              text = " ".join(s.text.strip() for s in segs)
+              print(f"{os.path.basename(wav)} -> {text[:120]!r}  [lang={info.language}]")
+          EOF
+
+      # ── Package as artifact — download from the Actions run page ─────────
+      - name: Upload converted model as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-stt-hinglish-ct2
+          path: ./zero-stt-hinglish-ct2/
+          # Retention: 7 days is enough to download and store locally
+          retention-days: 7

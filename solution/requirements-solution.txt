@@ -1,4 +1,10 @@
+# Darwin / Apple Silicon (MLX)
 mlx-whisper
 mlx-audio
 numpy
 huggingface_hub
+
+# Linux / x86-64 (faster-whisper CTranslate2)
+# Uncomment on Linux or install via requirements-linux.txt instead:
+# faster-whisper>=1.0
+# soundfile>=0.12

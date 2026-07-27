@@ -2,11 +2,17 @@
 
     python -m solution.transcribe --input clip.wav --mode auto --output result.json
 
-Uses the same dual-lane MLX engine architecture as the streaming track:
-  - fast/auto  → Parakeet-110m (sub-second English/Indian-English)
-  - hinglish   → Oriserve Apex via mlx-whisper (faithful romanized code-switch)
-  - auto       → whisper-tiny LID routes to the best lane automatically
-  - verbatim   → Apex with no finalization (raw faithful transcript)
+Platform-aware dual-lane engine:
+  Darwin (Apple Silicon):
+    fast/auto  → Parakeet-110m via MLX          (sub-second English/Indian-English)
+    hinglish   → Trelis Q4 via mlx-whisper       (faithful romanized code-switch)
+
+  Linux (x86-64):
+    fast/auto  → faster-distil-whisper-small.en  (int8 CTranslate2)
+    hinglish   → zero-stt-hinglish-ct2           (int8 CTranslate2)
+
+  auto mode → whisper-tiny LID routes to the best lane automatically.
+  verbatim  → hinglish engine with no finalization (raw faithful transcript).
 
 All models run offline once cached. warm_all() must be called before
 block_network() fires. No hardcoded phrase fixes.
@@ -72,30 +78,37 @@ def transcribe(wav_path: str, mode: str = "auto") -> dict:
     # --- decode on the chosen lane, with cross-lane fallback ---
     asr_t0 = time.time()
 
+    import platform as _plat
+    _darwin = _plat.system() == "Darwin"
+    _fast_id    = engines.PARAKEET_MODEL   if _darwin else engines.FW_ENGLISH_MODEL
+    _hing_id    = engines.HINGLISH_MODEL   if _darwin else engines.FW_HINGLISH_MODEL
+    _fast_name  = "parakeet-fast"          if _darwin else "fw-distil-small-en"
+    _hing_name  = "trelis-hinglish"        if _darwin else "fw-zero-stt-hinglish"
+
     if route == "hinglish":
         text = engines.transcribe_hinglish(audio)
         timings["hinglish_ms"] = engines.last_timings().get("hinglish_ms", 0)
-        model_ids.append(engines.APEX_MODEL)
-        candidates.append({"engine": "apex-hinglish", "text": text})
+        model_ids.append(_hing_id)
+        candidates.append({"engine": _hing_name, "text": text})
 
         if not text:
             # fallback to fast lane
             text = engines.transcribe_fast(audio)
             timings["fast_ms"] = engines.last_timings().get("fast_ms", 0)
-            model_ids.append(engines.PARAKEET_MODEL)
-            candidates.append({"engine": "parakeet-fast-fallback", "text": text})
+            model_ids.append(_fast_id)
+            candidates.append({"engine": f"{_fast_name}-fallback", "text": text})
     else:
         text = engines.transcribe_fast(audio)
         timings["fast_ms"] = engines.last_timings().get("fast_ms", 0)
-        model_ids.append(engines.PARAKEET_MODEL)
-        candidates.append({"engine": "parakeet-fast", "text": text})
+        model_ids.append(_fast_id)
+        candidates.append({"engine": _fast_name, "text": text})
 
         if not text:
             # fallback to hinglish lane
             text = engines.transcribe_hinglish(audio)
             timings["hinglish_ms"] = engines.last_timings().get("hinglish_ms", 0)
-            model_ids.append(engines.APEX_MODEL)
-            candidates.append({"engine": "apex-hinglish-fallback", "text": text})
+            model_ids.append(_hing_id)
+            candidates.append({"engine": f"{_hing_name}-fallback", "text": text})
 
     asr_ms = (time.time() - asr_t0) * 1000
 

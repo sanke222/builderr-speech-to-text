@@ -1,0 +1,20 @@
+# Linux / faster-whisper runtime requirements
+# Install with: pip install -r requirements-linux.txt
+
+# Core inference engine (CTranslate2 backend — works on CPU and CUDA)
+faster-whisper>=1.0
+
+# Conversion tooling (only needed when running scripts/convert_zero_stt.py)
+ctranslate2>=4.0
+transformers>=4.40
+torch>=2.1          # for ct2-transformers-converter model loading
+
+# Audio I/O
+soundfile>=0.12
+numpy>=1.24
+
+# Streaming track
+websockets>=12.0
+
+# HF Hub (model download + upload)
+huggingface_hub>=0.23
