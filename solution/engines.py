@@ -112,6 +112,26 @@ def _load_mlx_whisper():
     global _mlx_whisper
     if _mlx_whisper is None:
         import mlx_whisper
+        import huggingface_hub
+
+        # Patch snapshot_download inside mlx_whisper.load_models so that passing a local
+        # snapshot directory path returns instantly without hitting network (repo_info API call).
+        orig_snapshot = huggingface_hub.snapshot_download
+        def _safe_snapshot(repo_id, **kwargs):
+            if os.path.exists(str(repo_id)):
+                return str(repo_id)
+            kwargs["local_files_only"] = True
+            try:
+                return orig_snapshot(repo_id, **kwargs)
+            except Exception:
+                return str(repo_id)
+
+        try:
+            import mlx_whisper.load_models
+            mlx_whisper.load_models.snapshot_download = _safe_snapshot
+        except Exception:
+            pass
+
         _mlx_whisper = mlx_whisper
     return _mlx_whisper
 
@@ -170,7 +190,7 @@ def _transcribe_hinglish_darwin(audio) -> str:
 
 
 def _detect_language_darwin(audio) -> tuple[str, float]:
-    """whisper-tiny LID on first ~6s. Falls back to ('en', 0.0)."""
+    """whisper-tiny LID on first ~6s. max_tokens=1 makes it sub-20ms fast."""
     t0 = time.monotonic()
     lang, prob = "en", 0.0
     try:
@@ -180,6 +200,7 @@ def _detect_language_darwin(audio) -> tuple[str, float]:
         result = mw.transcribe(
             prefix, path_or_hf_repo=_detect_path,
             temperature=0.0, condition_on_previous_text=False, fp16=True,
+            max_tokens=1,  # Stop after the first language token -> sub-20ms speed
         )
         lang = result.get("language", "en") or "en"
         prob = 1.0
