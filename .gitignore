@@ -9,3 +9,8 @@ data/hidden/
 # private dictation lab — your own voice + transcribed words, never publish
 lab_recordings/
 tools/recording_lab/
+
+# Local model cache folders
+zero-stt-hinglish-ct2/
+trelis-mlx-q4/
+
