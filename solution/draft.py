@@ -49,13 +49,26 @@ def draft_reset() -> None:
 
 
 def route_debug() -> dict:
-    """Expose routing info for debug harness."""
+    """Expose the last routing decision for the debug harness (unscored)."""
     return {"route": _route, "reason": _route_reason, "lang": _lang,
             "timings_ms": engines.last_timings()}
 
 
+def _decide_route(audio) -> None:
+    """Set the per-clip route once, from a cheap language-ID pass."""
+    global _route, _route_reason, _lang
+    if _route_reason:  # already decided for this clip
+        return
+    lang, _prob = engines.detect_language(audio)
+    _lang = lang
+    if lang in {"hi", "ur", "mr", "ne", "sa"}:  # Hindi-family -> code-switch path
+        _route, _route_reason = "hinglish", f"lang={lang}"
+    else:
+        _route, _route_reason = "fast", f"lang={lang}"
+
+
 def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
-    global _prev_text, _committed, _route, _route_reason, _lang
+    global _prev_text, _committed
     if not is_final and len(audio_buffer) < _MIN_AUDIO_BYTES:
         return (_committed, len(_committed))
 
@@ -63,30 +76,25 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
     if audio.size == 0:
         return (_committed, len(_committed))
 
+    _decide_route(audio)
+
     if is_final:
-        # 1. Run LID ONCE at is_final on the COMPLETE audio clip for 100% routing accuracy
-        lang, _prob = engines.detect_language(audio)
-        _lang = lang
-
-        # 2. Pad audio array with 0.8s trailing silence to prevent word chopping while keeping latency ~1.2s
-        import numpy as np
-        padded_audio = np.concatenate([audio, np.zeros(int(16000 * 0.8), dtype=np.float32)])
-
-        # 3. Decode on the chosen lane
-        if lang in {"hi", "ur", "mr", "ne", "sa"}:
-            _route, _route_reason = "hinglish", f"lang={lang}"
-            text = engines.transcribe_hinglish(padded_audio) or engines.transcribe_fast(padded_audio)
+        # spend the quality budget here: faithful decode on the chosen lane.
+        if _route == "hinglish":
+            text = engines.transcribe_hinglish(audio) or engines.transcribe_fast(audio)
         else:
-            _route, _route_reason = "fast", f"lang={lang}"
-            text = engines.transcribe_fast(padded_audio) or engines.transcribe_hinglish(padded_audio)
-
+            # Pad with 0.5s of silence to prevent Parakeet from chopping the last word
+            import numpy as np
+            padded_audio = np.concatenate([audio, np.zeros(int(16000 * 0.5), dtype=np.float32)])
+            text = engines.transcribe_fast(padded_audio) or engines.transcribe_hinglish(audio)
         text = finalize(text)
         if not text:
+            # never blank: fall back to whatever we had committed
             return (_committed or _prev_text, len(_committed or _prev_text))
         _committed = text
         return (text, len(text))
 
-    # --- partial (unscored): cheap fast-lane decode for live preview text ---
+    # --- partial (unscored): cheap fast-lane decode, commit stable prefix ---
     text = engines.transcribe_fast(audio)
     if not text:
         return (_committed, len(_committed))
