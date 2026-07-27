@@ -350,18 +350,17 @@ def _transcribe_hinglish_linux(audio) -> str:
 
 
 def _detect_language_linux(audio) -> tuple[str, float]:
-    """faster-whisper tiny LID on first ~6s. Falls back to ('en', 0.0)."""
+    """faster-whisper tiny LID on first ~6s. Matches Mac transcribe-based LID."""
     t0 = time.monotonic()
     lang, prob = "en", 0.0
     try:
         np = _numpy()
         model = _load_fw_detect()
         prefix = audio[: _SR * 6] if audio.size > _SR * 6 else audio
-        # detect_language is a direct faster-whisper API — much faster than full transcription
-        detected_lang, lang_prob = model.detect_language(prefix)
-        lang = detected_lang or "en"
-        prob = float(lang_prob) if lang_prob is not None else 1.0
-        _ = np
+        segments, info = model.transcribe(prefix, beam_size=1, max_initial_timestamp=1.0)
+        lang = info.language or "en"
+        prob = float(info.language_probability) if info.language_probability is not None else 1.0
+        _ = (np, list(segments))
     except Exception:
         pass
     _last_timings["detect_ms"] = (time.monotonic() - t0) * 1000.0
