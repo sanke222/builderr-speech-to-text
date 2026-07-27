@@ -192,7 +192,7 @@ def _transcribe_hinglish_darwin(audio) -> str:
 
 
 def _detect_language_darwin(audio) -> tuple[str, float]:
-    """whisper-tiny LID on first ~6s. max_tokens=1 makes it sub-20ms fast."""
+    """whisper-tiny LID on first ~6s."""
     t0 = time.monotonic()
     lang, prob = "en", 0.0
     try:
@@ -202,7 +202,6 @@ def _detect_language_darwin(audio) -> tuple[str, float]:
         result = mw.transcribe(
             prefix, path_or_hf_repo=_detect_path,
             temperature=0.0, condition_on_previous_text=False, fp16=True,
-            max_tokens=1,  # Stop after the first language token -> sub-20ms speed
         )
         lang = result.get("language", "en") or "en"
         prob = 1.0
