@@ -371,6 +371,13 @@ def _detect_language_linux(audio) -> tuple[str, float]:
 
 def _warm_linux() -> dict[str, bool]:
     """Warm all faster-whisper engines. Called inside warm_all()."""
+    try:
+        from huggingface_hub import snapshot_download
+        for m in (FW_ENGLISH_MODEL, FW_HINGLISH_MODEL, FW_DETECT_MODEL):
+            snapshot_download(repo_id=m, repo_type="model")
+    except Exception as e:
+        import sys; sys.stderr.write(f"Pre-download note: {e}\n")
+
     np = _numpy()
     silence = np.zeros(_SR, dtype=np.float32)
     status: dict[str, bool] = {}

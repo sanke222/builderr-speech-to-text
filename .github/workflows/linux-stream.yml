@@ -65,14 +65,11 @@ jobs:
 
       # ── Step 1: Warmup — pull + initialise all models ─────────────────────
       - name: Warmup — pull + JIT all models (network allowed)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python - <<'EOF'
           import os
           # Temporarily unset offline guard so warm_all() can pull from HF
           os.environ.pop("HF_HUB_OFFLINE", None)
-          # Pass HF_TOKEN so private CT2 repos can be downloaded
           from solution import engines
           status = engines.warm_all()
           print("warmup status:", status)
