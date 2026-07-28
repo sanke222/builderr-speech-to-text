@@ -72,6 +72,91 @@ _fw_detect   = None      # Linux: faster-whisper WhisperModel (LID)
 
 _last_timings: dict[str, float] = {}
 
+import threading
+import concurrent.futures
+
+_DECODE_LOCK = threading.Lock()
+_DECODE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=3, thread_name_prefix="stt-decode")
+_TAIL_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="stt-tail")
+
+class _MlxClient:
+    def __init__(self):
+        self.proc = None
+        self.queue = None
+        self.dead = False
+
+    def start(self, ready_timeout: float = 120.0) -> bool:
+        import queue as _queue
+        import subprocess, sys
+        from pathlib import Path
+        if self.proc is not None or self.dead:
+            return self.proc is not None
+        root = Path(__file__).resolve().parent.parent
+        try:
+            self.proc = subprocess.Popen(
+                [sys.executable, "-u", "-m", "solution.mlx_worker", HINGLISH_MODEL],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, cwd=str(root), text=True,
+                encoding="utf-8")
+        except Exception:
+            self.dead = True
+            return False
+        self.queue = _queue.Queue()
+
+        def _reader(proc, q):
+            try:
+                for line in proc.stdout:
+                    q.put(line)
+            except Exception:
+                pass
+            q.put(None)
+
+        threading.Thread(target=_reader, args=(self.proc, self.queue), daemon=True).start()
+        line = self._get_line(ready_timeout)
+        if line is None or '"ready"' not in line:
+            self.kill()
+            return False
+        return True
+
+    def _get_line(self, timeout: float):
+        import queue as _queue
+        try:
+            return self.queue.get(timeout=timeout)
+        except _queue.Empty:
+            return None
+
+    def decode(self, audio, lang: str, timeout: float) -> str:
+        if self.proc is None or self.proc.poll() is not None:
+            raise RuntimeError("mlx worker not running")
+        import json as _json
+        import tempfile, wave as _wave
+        fd, path = tempfile.mkstemp(suffix=".wav", prefix="stt-mlx-")
+        os.close(fd)
+        try:
+            with _wave.open(path, "wb") as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(_SR)
+                w.writeframes((np.clip(audio, -1.0, 1.0) * 32767).astype(np.int16).tobytes())
+            self.proc.stdin.write(_json.dumps({"wav": path, "lang": lang}) + "\n")
+            self.proc.stdin.flush()
+            line = self._get_line(timeout)
+            if line is None:
+                raise TimeoutError(f"mlx worker gave no reply in {timeout:.1f}s")
+            resp = _json.loads(line)
+            if "error" in resp:
+                raise RuntimeError(f"mlx worker error: {resp['error']}")
+            return resp.get("text", "")
+        finally:
+            try: os.remove(path)
+            except OSError: pass
+
+    def kill(self) -> None:
+        self.dead = True
+        if self.proc is not None:
+            try: self.proc.kill()
+            except Exception: pass
+            self.proc = None
+
+_MLX_CLIENT = _MlxClient()
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -91,6 +176,34 @@ def pcm_to_float32(audio_buffer: bytes):
     if not audio_buffer:
         return np.zeros(0, dtype=np.float32)
     return np.frombuffer(audio_buffer, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+def speech_regions(audio) -> list[tuple[float, float]]:
+    """[(start_s, end_s), ...] speech spans using Silero VAD."""
+    try:
+        from faster_whisper.vad import VadOptions, get_speech_timestamps
+        opts = VadOptions(min_silence_duration_ms=500, speech_pad_ms=120)
+        ts = get_speech_timestamps(audio, vad_options=opts)
+        return [(t["start"] / _SR, t["end"] / _SR) for t in ts]
+    except Exception:
+        if audio.size == 0:
+            return []
+        return [(0.0, audio.size / _SR)]
+
+
+def trim_to_speech(audio, pad_s: float = 0.25):
+    """Cut leading/trailing non-speech."""
+    try:
+        regions = speech_regions(audio)
+        if not regions:
+            return audio[: 0]
+        start = max(0, int((regions[0][0] - pad_s) * _SR))
+        end = min(audio.size, int((regions[-1][1] + pad_s) * _SR))
+        if end - start < audio.size * 0.98:
+            return audio[start:end]
+        return audio
+    except Exception:
+        return audio
 
 
 def last_timings() -> dict[str, float]:
@@ -170,20 +283,18 @@ def _transcribe_hinglish_darwin(audio) -> str:
     """Trelis MLX faithful code-switch decode. '' on failure."""
     t0 = time.monotonic()
     try:
-        mw = _load_mlx_whisper()
-        result = mw.transcribe(
-            audio,
-            path_or_hf_repo=_hinglish_path,
-            language="hi",
-            temperature=0.0,
-            condition_on_previous_text=False,
-            initial_prompt=(
-                "Yeh audio ek technical meeting hai. Always use English terms for open source "
-                "software, features, aur operating systems. Write numbers in digits (jaise 3, 4, 100)."
-            ),
-            fp16=True,
-        )
-        out = (result.get("text") or "").strip()
+        with _DECODE_LOCK:
+            if _MLX_CLIENT.proc is None and not _MLX_CLIENT.dead:
+                if not _MLX_CLIENT.start(ready_timeout=120.0):
+                    pass # handled by dead flag
+            if _MLX_CLIENT.proc is not None:
+                try:
+                    out = _MLX_CLIENT.decode(audio, "hi", timeout=15.0)
+                except Exception as exc:
+                    _MLX_CLIENT.kill()
+                    out = ""
+            else:
+                out = ""
     except Exception:
         import traceback; traceback.print_exc()
         out = ""

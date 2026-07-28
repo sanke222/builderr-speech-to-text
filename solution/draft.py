@@ -23,6 +23,8 @@ final keeps the paste fast.
 from __future__ import annotations
 
 import re
+import threading
+import time
 
 from solution import engines
 from solution.finalizer import finalize
@@ -36,16 +38,37 @@ _committed: str = ""
 _route: str = "fast"        # 'fast' | 'hinglish', decided once per clip
 _route_reason: str = ""
 _lang: str = ""
+_finalized_s: float = 0.0
+_chunk_future = None
+_chunk_lock = threading.Lock()
+
+
+def _join(a: str, b: str) -> str:
+    if not a: return b
+    if not b: return a
+    return a + " " + b
+
+
+def _bg_decode(audio, route):
+    if route == "hinglish":
+        text = engines.transcribe_hinglish(audio) or engines.transcribe_fast(audio)
+    else:
+        import numpy as np
+        padded_audio = np.concatenate([audio, np.zeros(int(_SR * 0.5), dtype=np.float32)])
+        text = engines.transcribe_fast(padded_audio) or engines.transcribe_hinglish(audio)
+    return finalize(text)
 
 
 def draft_reset() -> None:
     """Called by the sealed harness at the start of each clip. Clear state."""
-    global _prev_text, _committed, _route, _route_reason, _lang
+    global _prev_text, _committed, _route, _route_reason, _lang, _finalized_s, _chunk_future
     _prev_text = ""
     _committed = ""
     _route = "fast"
     _route_reason = ""
     _lang = ""
+    _finalized_s = 0.0
+    _chunk_future = None
 
 
 def route_debug() -> dict:
@@ -68,7 +91,7 @@ def _decide_route(audio) -> None:
 
 
 def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
-    global _prev_text, _committed
+    global _prev_text, _committed, _finalized_s, _chunk_future
     if not is_final and len(audio_buffer) < _MIN_AUDIO_BYTES:
         return (_committed, len(_committed))
 
@@ -78,31 +101,63 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
 
     _decide_route(audio)
 
-    if is_final:
-        # spend the quality budget here: faithful decode on the chosen lane.
-        if _route == "hinglish":
-            text = engines.transcribe_hinglish(audio) or engines.transcribe_fast(audio)
-        else:
-            # Pad with 0.5s of silence to prevent Parakeet from chopping the last word
-            import numpy as np
-            padded_audio = np.concatenate([audio, np.zeros(int(16000 * 0.5), dtype=np.float32)])
-            text = engines.transcribe_fast(padded_audio) or engines.transcribe_hinglish(audio)
-        text = finalize(text)
-        if not text:
-            # never blank: fall back to whatever we had committed
-            return (_committed or _prev_text, len(_committed or _prev_text))
-        _committed = text
-        return (text, len(text))
+    # 1. Commit any completed background chunk
+    with _chunk_lock:
+        if _chunk_future and _chunk_future.done():
+            try:
+                res = _chunk_future.result()
+                if res:
+                    _committed = _join(_committed, res)
+            except Exception:
+                pass
+            _chunk_future = None
 
-    # --- partial (unscored): cheap fast-lane decode, commit stable prefix ---
-    text = engines.transcribe_fast(audio)
+    if is_final:
+        # wait a tiny bit for any in-flight chunk
+        t0 = time.monotonic()
+        while _chunk_future and time.monotonic() - t0 < 0.5:
+            with _chunk_lock:
+                if _chunk_future.done():
+                    try:
+                        res = _chunk_future.result()
+                        if res:
+                            _committed = _join(_committed, res)
+                    except Exception:
+                        pass
+                    _chunk_future = None
+                    break
+            time.sleep(0.02)
+        
+        # slice remaining tail and decode
+        tail = audio[int(_finalized_s * _SR):]
+        if tail.size > int(0.2 * _SR):
+            text = _bg_decode(tail, _route)
+            if text:
+                _committed = _join(_committed, text)
+        
+        if not _committed:
+            return (_prev_text, len(_prev_text))
+        return (_committed, len(_committed))
+
+    # --- background chunking ---
+    pending_audio = audio[int(_finalized_s * _SR):]
+    if not _chunk_future and pending_audio.size > _SR * 3.5:
+        regions = engines.speech_regions(pending_audio)
+        if len(regions) > 1:
+            boundary = regions[-2][1] + 0.15
+            if boundary > 2.0:
+                chunk = pending_audio[:int(boundary * _SR)]
+                _chunk_future = engines._DECODE_EXECUTOR.submit(_bg_decode, chunk, _route)
+                _finalized_s += boundary
+                pending_audio = pending_audio[int(boundary * _SR):]
+
+    # --- partial (unscored): cheap fast-lane decode ---
+    text = engines.transcribe_fast(pending_audio)
     if not text:
         return (_committed, len(_committed))
-    stable = _common_word_prefix(_prev_text, text)
-    if len(stable) >= len(_committed):
-        _committed = stable
+    
     _prev_text = text
-    return (text, len(_committed))
+    return (_join(_committed, text), len(_committed))
 
 
 def _common_word_prefix(left: str, right: str) -> str:
