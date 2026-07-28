@@ -291,6 +291,9 @@ def _transcribe_hinglish_darwin(audio) -> str:
                 try:
                     out = _MLX_CLIENT.decode(audio, "hi", timeout=15.0)
                 except Exception as exc:
+                    import traceback
+                    traceback.print_exc()
+                    print(f"MLX_CLIENT CRASH: {exc}")
                     _MLX_CLIENT.kill()
                     out = ""
             else:

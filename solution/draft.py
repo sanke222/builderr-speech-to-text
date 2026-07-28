@@ -113,9 +113,9 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
             _chunk_future = None
 
     if is_final:
-        # wait a tiny bit for any in-flight chunk
+        # wait up to 4.0 seconds for the final background chunk to finish
         t0 = time.monotonic()
-        while _chunk_future and time.monotonic() - t0 < 0.5:
+        while _chunk_future and time.monotonic() - t0 < 4.0:
             with _chunk_lock:
                 if _chunk_future.done():
                     try:
@@ -130,11 +130,13 @@ def draft(audio_buffer: bytes, is_final: bool) -> tuple[str, int]:
         
         # slice remaining tail and decode
         tail = audio[int(_finalized_s * _SR):]
+        # Only do a heavy decode if we actually have committed text or if the tail is all we have
         if tail.size > int(0.2 * _SR):
             text = _bg_decode(tail, _route)
             if text:
                 _committed = _join(_committed, text)
         
+        # If we failed to get anything from the strong lane, fall back to fast lane
         if not _committed:
             return (_prev_text, len(_prev_text))
         return (_committed, len(_committed))
